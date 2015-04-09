@@ -23,6 +23,7 @@ install(FILES
     TextDocumentPage.qml
     TextDocumentToCPage.qml
     ZoomableThumbnail.qml
+    ToolBar.qml
     DetailsPage.qml
     DetailsItem.qml
     DocumentPages.qml

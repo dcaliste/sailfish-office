@@ -78,7 +78,24 @@ DocumentPage {
                 onFocusChanged: if (focus) base.open = false
             }
         }
+    }
 
+    ToolBar {
+        id: toolbar
+        width: parent.width
+        height: base.orientation == Orientation.Portrait || base.orientation == Orientation.InvertedPortrait
+        ? Theme.itemSizeLarge
+        : Theme.itemSizeSmall
+        parentHeight: base.height
+        flickable: view
+        hidden: base.open
+
+        // Toolbar contain.
+        Row {
+            id: row
+            width: parent.width
+            height: parent.height
+        }
     }
 
     PDF.Document {
