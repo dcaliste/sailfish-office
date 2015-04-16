@@ -23,13 +23,16 @@ Page {
     id: page;
     signal pageSelected(int pageNumber);
 
+    property int pageCount
     property alias tocModel: tocListView.model;
 
     allowedOrientations: Orientation.All;
 
     SilicaListView {
         id: tocListView
-        anchors.fill: parent;
+        width: parent.width
+        height: parent.height - gotoPage.height
+        clip: true
 
         //: Page with PDF index
         //% "Index"
@@ -64,6 +67,33 @@ Page {
 
             onClicked: {
                 page.pageSelected(model.pageNumber - 1);
+                pageStack.navigateBack(PageStackAction.Animated);
+            }
+        }
+    }
+
+    PanelBackground {
+        id: gotoPage
+        anchors.top: tocListView.bottom
+        width: parent.width
+        height: Theme.itemSizeMedium
+
+        TextField {
+            x: Theme.paddingLarge
+            width: parent.width - Theme.paddingMedium - Theme.paddingLarge
+            anchors.verticalCenter: parent.verticalCenter
+
+            //% "Go to page"
+            placeholderText: qsTrId("sailfish-office-lb-goto-page")
+            //% "document has %n pages"
+            label: qsTrId("sailfish-office-lb-%n-pages", page.pageCount)
+
+            // We enter page numbers
+            inputMethodHints: Qt.ImhDigitsOnly
+            EnterKey.enabled: text.length > 0 && Math.round(text) > 0 && Math.round(text) <= page.pageCount
+            EnterKey.iconSource: "image://theme/icon-m-enter-accept"
+            EnterKey.onClicked: {
+                page.pageSelected(Math.round(text) - 1);
                 pageStack.navigateBack(PageStackAction.Animated);
             }
         }
