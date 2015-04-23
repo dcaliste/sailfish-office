@@ -35,6 +35,13 @@ Page {
         //% "Index"
         header: PageHeader { title: qsTrId( "sailfish-office-he-pdf_index" ); }
 
+        ViewPlaceholder {
+            id: placeholder
+            //% "Document has no table of content"
+            text: qsTrId("sailfish-office-me-no-toc")
+        }
+        onModelChanged: placeholder.enabled = !model || (model.count == 0)
+
         delegate: BackgroundItem {
             id: bg;
 
