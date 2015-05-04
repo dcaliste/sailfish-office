@@ -19,6 +19,7 @@
 #include "pdfdocument.h"
 #include "pdfrenderthread.h"
 #include "pdfjob.h"
+#include "pdfsearchmodel.h"
 
 #include <QDebug>
 #include <QUrl>
@@ -31,6 +32,8 @@ public:
     Private() : document( nullptr ), completed(false) { }
 
     PDFRenderThread* thread;
+
+    PDFSearchModel *searchModel;
 
     Poppler::Document* document;
     QString source;
@@ -45,11 +48,15 @@ PDFDocument::PDFDocument(QObject* parent)
     connect( d->thread, &PDFRenderThread::loadFinished, this, &PDFDocument::pageCountChanged );
     connect( d->thread, &PDFRenderThread::loadFinished, this, &PDFDocument::loadFinished );
     connect( d->thread, &PDFRenderThread::jobFinished, this, &PDFDocument::jobFinished );
+
+    d->searchModel = nullptr;
 }
 
 PDFDocument::~PDFDocument()
 {
     delete d->thread;
+    if (d->searchModel != nullptr)
+      delete d->searchModel;
 }
 
 QString PDFDocument::source() const
@@ -70,6 +77,11 @@ int PDFDocument::pageCount() const
 QObject* PDFDocument::tocModel() const
 {
     return d->thread->tocModel();
+}
+
+QObject* PDFDocument::searchModel() const
+{
+    return d->searchModel;
 }
 
 bool PDFDocument::isLoaded() const
@@ -166,6 +178,23 @@ void PDFDocument::requestPageSizes()
     d->thread->queueJob( job );
 }
 
+void PDFDocument::search(const QString &search)
+{
+    if(!isLoaded() || isLocked())
+        return;
+
+    if (d->searchModel != nullptr) {
+        delete d->searchModel;
+        d->searchModel = nullptr;
+        emit searchModelChanged();
+    }
+
+    if (search.length() > 0) {
+        SearchDocumentJob* job = new SearchDocumentJob(search);
+        d->thread->queueJob(job);
+    }
+}
+
 void PDFDocument::loadFinished()
 {
     if (d->thread->isFailed())
@@ -189,6 +218,14 @@ void PDFDocument::jobFinished(PDFJob* job)
         case PDFJob::PageSizesJob: {
             PageSizesJob* j = static_cast<PageSizesJob*>(job);
             emit pageSizesFinished(j->m_pageSizes);
+            break;
+        }
+        case PDFJob::SearchDocumentJob: {
+            SearchDocumentJob* j = static_cast<SearchDocumentJob*>(job);
+            if (d->searchModel)
+              delete d->searchModel;
+            d->searchModel = new PDFSearchModel(j->m_matches);
+            emit searchModelChanged();
             break;
         }
         default:
