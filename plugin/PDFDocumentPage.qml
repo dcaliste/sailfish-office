@@ -38,7 +38,6 @@ DocumentPage {
         height: base.height;
 
         document: pdfDocument;
-        searchModel: pdfDocument.searchModel
 
         onClicked: base.open = !base.open;
 
@@ -91,11 +90,17 @@ DocumentPage {
         parentHeight: base.height
         flickable: view
         hidden: base.open
+        autoHide: search.text.length == 0 && !search.activeFocus
 
         // Toolbar contain.
         Row {
             id: row
             height: parent.height
+            x: search.activeFocus ? -pageCount.width : 0
+
+            Behavior on x {
+                NumberAnimation { easing.type: Easing.InOutQuad; duration: 400 }
+            }
 
             Item {
                 anchors.verticalCenter: parent.verticalCenter
@@ -117,17 +122,32 @@ DocumentPage {
                     onClicked: base.pushAttachedPage()
                 }
             }
-            Item {
-                // Spacer, to be replaced later with a search field.
-                width: toolbar.width - pageCount.width - pdfTOC.width
-                height: parent.height
-            }
-	    IconButton {
-		id: pdfTOC
+            SearchField {
+                id: search
+                width: activeFocus ? toolbar.width : toolbar.width - pageCount.width - ( pdfDocument.searchModel ? searchPrev.width + searchNext.width : 0)
                 anchors.verticalCenter: parent.verticalCenter
-		icon.source: "image://theme/icon-m-menu"
-		onClicked: base.pushAttachedPage()
-	    }
+
+                inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhPreferLowercase | Qt.ImhNoPredictiveText
+                EnterKey.onClicked: { focus = false; pdfDocument.search(text) }
+
+                Behavior on width {
+                    NumberAnimation { easing.type: Easing.InOutQuad; duration: 400 }
+                }
+            }
+            IconButton {
+                id: searchPrev
+                anchors.verticalCenter: parent.verticalCenter
+                icon.source: "image://theme/icon-m-left"
+                enabled: pdfDocument.searchModel && pdfDocument.searchModel.count > 0
+                onClicked: view.prevSearchMatch()
+            }
+            IconButton {
+                id: searchNext
+                anchors.verticalCenter: parent.verticalCenter
+                icon.source: "image://theme/icon-m-right"
+                enabled: pdfDocument.searchModel && pdfDocument.searchModel.count > 0
+                onClicked: view.nextSearchMatch()
+            }
         }
     }
 
