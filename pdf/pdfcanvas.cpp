@@ -278,9 +278,17 @@ void PDFCanvas::layout()
     update();
 }
 
-static qreal squaredDistanceFromRect(const QRectF &rect, const QPoint &point)
+qreal PDFCanvas::squaredDistanceFromRect(const QRectF &pageRect,
+                                         const QRectF &reducedCoordRect,
+                                         const QPointF &point)
 {
     qreal dist = 0.;
+    QRectF rect {
+        reducedCoordRect.x() * pageRect.width(),
+        reducedCoordRect.y() * pageRect.height() + pageRect.y(),
+        reducedCoordRect.width() * pageRect.width(),
+        reducedCoordRect.height() * pageRect.height()
+    };
 
     if ((qreal)point.x() < rect.left()) {
         dist += (rect.left() - (qreal)point.x()) * (rect.left() - (qreal)point.x());
@@ -296,7 +304,7 @@ static qreal squaredDistanceFromRect(const QRectF &rect, const QPoint &point)
     return dist;
 }
 
-QUrl PDFCanvas::urlAtPoint(const QPoint &point)
+QUrl PDFCanvas::urlAtPoint(const QPointF &point)
 {
     for (int i = 0; i < d->pageCount; ++i) {
         const PDFPage &page = d->pages.value(i);
@@ -304,13 +312,8 @@ QUrl PDFCanvas::urlAtPoint(const QPoint &point)
             qreal squaredDistanceMin = d->linkWiggle * d->linkWiggle;
             QUrl url;
             for (const QPair<QRectF, QUrl> &link : page.links) {
-                QRectF hitTarget{
-                    link.first.x() * page.rect.width(),
-                    link.first.y() * page.rect.height() + page.rect.y(),
-                    link.first.width() * page.rect.width(),
-                    link.first.height() * page.rect.height()
-                };
-                qreal squaredDistance = squaredDistanceFromRect(hitTarget, point);
+                qreal squaredDistance =
+                    squaredDistanceFromRect(page.rect, link.first, point);
                 
                 if (squaredDistance < squaredDistanceMin) {
                     url = link.second;
@@ -324,7 +327,7 @@ QUrl PDFCanvas::urlAtPoint(const QPoint &point)
     return QUrl();
 }
 
-QRectF PDFCanvas::fromPageToItem(int index, const QRectF &rect)
+QRectF PDFCanvas::fromPageToItem(int index, const QRectF &rect) const
 {
     if (index < 0 || index >= d->pageCount)
         return QRectF();
@@ -334,6 +337,15 @@ QRectF PDFCanvas::fromPageToItem(int index, const QRectF &rect)
                   rect.y() * page.rect.height() + page.rect.y(),
                   rect.width() * page.rect.width(),
                   rect.height() * page.rect.height());
+}
+QPointF PDFCanvas::fromPageToItem(int index, const QPointF &point) const
+{
+    if (index < 0 || index >= d->pageCount)
+        return QPointF();
+
+    const PDFPage &page = d->pages.value(index);
+    return QPointF(point.x() * page.rect.width() + page.rect.x(),
+                   point.y() * page.rect.height() + page.rect.y());
 }
 
 void PDFCanvas::pageFinished(int id, QSGTexture *texture)
@@ -544,4 +556,15 @@ void PDFCanvas::pageSizesFinished(const QList<QSizeF> &sizes)
 {
     d->pageSizes = sizes;
     layout();
+}
+
+QPair<int, QRectF> PDFCanvas::pageAtPoint(const QPointF &point) const
+{
+    for (int i = 0; i < d->pageCount; ++i) {
+        const PDFPage& page = d->pages.value(i);
+        if (page.rect.contains(point)) {
+            return QPair<int, QRectF>{i, page.rect};
+        }
+    }
+    return QPair<int, QRectF>{-1, QRectF()};
 }
