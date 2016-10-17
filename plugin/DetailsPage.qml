@@ -48,11 +48,16 @@ Page {
                 title: qsTrId("sailfish-office-he-details")
             }
 
-            DetailItem {
-                //: File name detail of the document
-                //% "File Name"
-                label: qsTrId("sailfish-office-la-filename")
-                value: info.fileName
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                height: implicitHeight + 2 * Theme.paddingSmall
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.highlightColor
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.Wrap
+                text: info.fileName
             }
 
             DetailItem {
