@@ -79,6 +79,7 @@ DocumentPage {
                 }
                 view.goToPage( last[0] - 1, last[1], last[2] )
             }
+            toolbar.show()
         }
     }
 
