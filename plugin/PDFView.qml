@@ -24,9 +24,10 @@ import org.nemomobile.configuration 1.0
 SilicaFlickable {
     id: base
 
-    contentWidth: pdfCanvas.width
-    contentHeight: pdfCanvas.height
+    contentWidth: contentColumn.width
+    contentHeight: contentColumn.height
 
+    property alias header: headerLoader.sourceComponent
     property alias itemWidth: pdfCanvas.width
     property alias itemHeight: pdfCanvas.height
     property alias document: pdfCanvas.document
@@ -77,18 +78,10 @@ SilicaFlickable {
         _contentYAtGotoLink = -1.
     }
 
-    function adjust() {
-        var oldWidth = pdfCanvas.width
-        var oldHeight = pdfCanvas.height
-        var oldContentX = contentX
-        var oldContentY = contentY
-
-        pdfCanvas.width = scaled ? clamp(pdfCanvas.width) : width
-
-        contentX = oldContentX * pdfCanvas.width / oldWidth
-        if (!contextHook.active) {
-            contentY = oldContentY * pdfCanvas.height / oldHeight
-        }
+    function adjust(pageWidth, fixPoint) {
+        pdfCanvas._fixPoint = fixPoint
+        pdfCanvas.width = scaled ? clamp(pdfCanvas.width)
+                                 : Math.max(pageWidth, base.width)
     }
 
     function moveToSearchMatch(index) {
@@ -96,11 +89,12 @@ SilicaFlickable {
 
         _searchIndex = index
         
-        var match = searchDisplay.itemAt(index)
+        var item = searchDisplay.itemAt(index)
+        var match = pdfCanvas.mapToItem(contentColumn, item.x, item.y, item.width, item.height)
         var cX = match.x + match.width / 2. - width / 2.
-        cX = Math.max(0, Math.min(cX, pdfCanvas.width - width))
+        cX = Math.max(0, Math.min(cX, contentColumn.width - width))
         var cY = match.y + match.height / 2. - height / 2.
-        cY = Math.max(0, Math.min(cY, pdfCanvas.height - height))
+        cY = Math.max(0, Math.min(cY, contentColumn.height - height))
 
         scrollTo(Qt.point(cX, cY), match.page, match)
     }
@@ -210,7 +204,7 @@ SilicaFlickable {
     }
 
     // Ensure proper zooming level when device is rotated.
-    onWidthChanged: adjust()
+    onWidthChanged: adjust(width, getPagePosition())
     Component.onCompleted: {
         // Avoid hard dependency to feedback
         _feedbackEffect = Qt.createQmlObject("import QtQuick 2.0; import QtFeedback 5.0; ThemeEffect { effect: ThemeEffect.PressWeak }",
@@ -273,148 +267,173 @@ SilicaFlickable {
         onSelectedChanged: if (selected) Clipboard.text = text
     }
 
-    PDF.Canvas {
-        id: pdfCanvas
+    Column {
+        id: contentColumn
+        width: pdfCanvas.width
 
-        property bool _pageSizesReady
+        onHeightChanged: {
+            if (pdfCanvas._fixPoint === undefined) return
 
-        width: base.width
+            var pt = contentAt(pdfCanvas._fixPoint[0], pdfCanvas._fixPoint[1],
+                               pdfCanvas._fixPoint[2])
+            contentX = Math.max(0, pt.x)
+            if (!contextHook.active &&
+                (pdfCanvas._fixPoint[0] > 0 || pdfCanvas._fixPoint[1] >= 0.)) {
+                contentY = Math.max(0, pt.y)
+            }            
 
-        spacing: Theme.paddingLarge
-        flickable: base
-        linkWiggle: Theme.itemSizeMedium / 2
-        linkColor: Theme.highlightColor
-        pagePlaceholderColor: Theme.highlightColor
-
-        onPageLayoutChanged: {
-            if (!_pageSizesReady) {
-                _pageSizesReady = true
-                base.pageSizesReady()
-            }
+            pdfCanvas._fixPoint = undefined
         }
 
-        onCurrentPageChanged: {
-            // If the document is moved than more than one page
-            // the back move is cancelled.
-            if (_pageAtLinkTarget > 0
-                && !scrollAnimation.running
-                && !quickScrollAnimation.running
-                && (currentPage > _pageAtLinkTarget + 1
-                    || currentPage < _pageAtLinkTarget - 1)) {
-                _pageAtLinkTarget = 0
-                _contentXAtGotoLink = -1.
-                _contentYAtGotoLink = -1.
-            }
+        Loader {
+            id: headerLoader
+            width: base.width
+            x: base.contentX
         }
 
-        PinchArea {
-            anchors.fill: parent
-            onPinchUpdated: {
-                var newCenter = mapToItem(pdfCanvas, pinch.center.x, pinch.center.y)
-                base.zoom(1.0 + (pinch.scale - pinch.previousScale), newCenter)
-            }
-            onPinchFinished: base.returnToBounds()
+        PDF.Canvas {
+            id: pdfCanvas
 
-            PDF.LinkArea {
-                id: linkArea
+            property bool _pageSizesReady
+            property var _fixPoint
+
+            width: base.width
+
+            spacing: Theme.paddingLarge
+            flickable: base
+            linkWiggle: Theme.itemSizeMedium / 2
+            linkColor: Theme.highlightColor
+            pagePlaceholderColor: Theme.highlightColor
+
+            onPageLayoutChanged: {
+                if (!_pageSizesReady) {
+                    _pageSizesReady = true
+                    base.pageSizesReady()
+                }
+            }
+            onCurrentPageChanged: {
+                // If the document is moved than more than one page
+                // the back move is cancelled.
+                if (_pageAtLinkTarget > 0
+                    && !scrollAnimation.running
+                    && !quickScrollAnimation.running
+                    && (currentPage > _pageAtLinkTarget + 1
+                        || currentPage < _pageAtLinkTarget - 1)) {
+                    _pageAtLinkTarget = 0
+                    _contentXAtGotoLink = -1.
+                    _contentYAtGotoLink = -1.
+                }
+            }
+
+            PinchArea {
                 anchors.fill: parent
+                onPinchUpdated: {
+                    var newCenter = mapToItem(pdfCanvas, pinch.center.x, pinch.center.y)
+                    base.zoom(1.0 + (pinch.scale - pinch.previousScale), newCenter)
+                }
+                onPinchFinished: base.returnToBounds()
 
-                onClickedBoxChanged: {
-                    if (clickedBox.width > 0) {
-                        contextHook.setTarget(clickedBox.y, clickedBox.height)
+                PDF.LinkArea {
+                    id: linkArea
+                    anchors.fill: parent
+
+                    onClickedBoxChanged: {
+                        if (clickedBox.width > 0) {
+                            contextHook.setTarget(clickedBox.y, clickedBox.height)
+                        }
+                    }
+
+                    canvas: pdfCanvas
+                    selection: pdfSelection
+
+                    onLinkClicked: base.linkClicked(linkTarget, contextHook)
+                    onGotoClicked: {
+                        var pt = base.contentAt(page - 1, top, left,
+                                                Theme.paddingLarge, Theme.paddingLarge)
+                        _pageAtLinkTarget = page
+                        _pageAtGotoLink = pdfCanvas.currentPage
+                        _contentXAtGotoLink = base.contentX
+                        _contentYAtGotoLink = base.contentY
+                        scrollTo(pt, page)
+                    }
+                    onSelectionClicked: base.selectionClicked(selection, contextHook)
+                    onAnnotationClicked: base.annotationClicked(annotation, contextHook)
+                    onClicked: base.clicked()
+                    onAnnotationLongPress: base.annotationLongPress(annotation, contextHook)
+                    onLongPress: {
+                        contextHook.setTarget(pressAt.y, Theme.itemSizeSmall / 2)
+                        base.longPress(pressAt, contextHook)
                     }
                 }
-
-                canvas: pdfCanvas
-                selection: pdfSelection
-
-                onLinkClicked: base.linkClicked(linkTarget, contextHook)
-                onGotoClicked: {
-                    var pt = base.contentAt(page - 1, top, left,
-                                            Theme.paddingLarge, Theme.paddingLarge)
-                    _pageAtLinkTarget = page
-                    _pageAtGotoLink = pdfCanvas.currentPage
-                    _contentXAtGotoLink = base.contentX
-                    _contentYAtGotoLink = base.contentY
-                    scrollTo(pt, page)
-                }
-                onSelectionClicked: base.selectionClicked(selection, contextHook)
-                onAnnotationClicked: base.annotationClicked(annotation, contextHook)
-                onClicked: base.clicked()
-                onAnnotationLongPress: base.annotationLongPress(annotation, contextHook)
-                onLongPress: {
-                    contextHook.setTarget(pressAt.y, Theme.itemSizeSmall / 2)
-                    base.longPress(pressAt, contextHook)
-                }
             }
-        }
 
-        Rectangle {
-            x: linkArea.clickedBox.x
-            y: linkArea.clickedBox.y
-            width: linkArea.clickedBox.width
-            height: linkArea.clickedBox.height
-            radius: Theme.paddingSmall
-            color: Theme.highlightColor
-            opacity: linkArea.pressed ? 0.75 : 0.
-            visible: opacity > 0.
-            Behavior on opacity { FadeAnimation { duration: 100 } }
-        }
-
-        Repeater {
-            id: searchDisplay
-
-            model: pdfCanvas.document.searchModel
-
-            delegate: Rectangle {
-                property int page: model.page
-                property rect pageRect: model.rect
-                property rect match: pdfCanvas.fromPageToItem(page, pageRect)
-                Connections {
-                    target: pdfCanvas
-                    onPageLayoutChanged: match = pdfCanvas.fromPageToItem(page, pageRect)
-                }
-
-                opacity: 0.5
+            Rectangle {
+                x: linkArea.clickedBox.x
+                y: linkArea.clickedBox.y
+                width: linkArea.clickedBox.width
+                height: linkArea.clickedBox.height
+                radius: Theme.paddingSmall
                 color: Theme.highlightColor
-                x: match.x - Theme.paddingSmall / 2
-                y: match.y - Theme.paddingSmall / 4
-                width: match.width + Theme.paddingSmall
-                height: match.height + Theme.paddingSmall / 2
+                opacity: linkArea.pressed ? 0.75 : 0.
+                visible: opacity > 0.
+                Behavior on opacity { FadeAnimation { duration: 100 } }
             }
-        }
 
-        PDFSelectionView {
-            id: selectionView
-            model: pdfSelection
-            flickable: base
-            dragHandle1: drag1.pressed
-            dragHandle2: drag2.pressed
-            onVisibleChanged: if (visible && _feedbackEffect) _feedbackEffect.play()
-        }
-        PDFSelectionDrag {
-            id: drag1
-            visible: pdfSelection.selected && selectionView.draggable
-            flickable: base
-            handle: pdfSelection.handle1
-            onDragged: pdfSelection.handle1 = at
-        }
-        PDFSelectionDrag {
-            id: drag2
-            visible: pdfSelection.selected && selectionView.draggable
-            flickable: base
-            handle: pdfSelection.handle2
-            onDragged: pdfSelection.handle2 = at
-        }
-        ContextMenuHook {
-            id: contextHook
-            Connections {
-                target: linkArea
-                onPositionChanged: if (contextHook.active) {
-                    var local = linkArea.mapToItem(contextHook, at.x, at.y)
-                    contextHook.positionChanged(Qt.point(local.x, local.y))
+            Repeater {
+                id: searchDisplay
+
+                model: pdfCanvas.document.searchModel
+
+                delegate: Rectangle {
+                    property int page: model.page
+                    property rect pageRect: model.rect
+                    property rect match: pdfCanvas.fromPageToItem(page, pageRect)
+                    Connections {
+                        target: pdfCanvas
+                        onPageLayoutChanged: match = pdfCanvas.fromPageToItem(page, pageRect)
+                    }
+
+                    opacity: 0.5
+                    color: Theme.highlightColor
+                    x: match.x - Theme.paddingSmall / 2
+                    y: match.y - Theme.paddingSmall / 4
+                    width: match.width + Theme.paddingSmall
+                    height: match.height + Theme.paddingSmall / 2
                 }
-                onReleased: if (contextHook.active) contextHook.released(true)
+            }
+
+            PDFSelectionView {
+                id: selectionView
+                model: pdfSelection
+                flickable: base
+                dragHandle1: drag1.pressed
+                dragHandle2: drag2.pressed
+                onVisibleChanged: if (visible && _feedbackEffect) _feedbackEffect.play()
+            }
+            PDFSelectionDrag {
+                id: drag1
+                visible: pdfSelection.selected && selectionView.draggable
+                flickable: base
+                handle: pdfSelection.handle1
+                onDragged: pdfSelection.handle1 = at
+            }
+            PDFSelectionDrag {
+                id: drag2
+                visible: pdfSelection.selected && selectionView.draggable
+                flickable: base
+                handle: pdfSelection.handle2
+                onDragged: pdfSelection.handle2 = at
+            }
+            ContextMenuHook {
+                id: contextHook
+                Connections {
+                    target: linkArea
+                    onPositionChanged: if (contextHook.active) {
+                        var local = linkArea.mapToItem(contextHook, at.x, at.y)
+                        contextHook.positionChanged(Qt.point(local.x, local.y))
+                    }
+                    onReleased: if (contextHook.active) contextHook.released(true)
+                }
             }
         }
     }
@@ -439,43 +458,41 @@ SilicaFlickable {
         if (left !== undefined && left >= 0.) {
             scrollX = rect.x + left * rect.width - ( leftSpacing !== undefined ? leftSpacing : 0.)
         }
-        if (scrollX > contentWidth - width) {
-            scrollX = contentWidth - width
-        }
+        scrollX = Math.min(scrollX, pdfCanvas.width - width)
         // Adjust vertical position.
         scrollY = rect.y + (top === undefined ? 0. : top * rect.height) - ( topSpacing !== undefined ? topSpacing : 0.)
-        if (scrollY > contentHeight - height) {
-            scrollY = contentHeight - height
-        }
-        return Qt.point(Math.max(0, scrollX), Math.max(0, scrollY))
+        scrollY = Math.min(scrollY, pdfCanvas.height - height)
+        return pdfCanvas.mapToItem(contentColumn, scrollX, scrollY)
     }
     function goToPage(pageNumber, top, left, topSpacing, leftSpacing) {
         var pt = contentAt(pageNumber, top, left, topSpacing, leftSpacing)
-        contentX = pt.x
-        contentY = pt.y
+        contentX = Math.max(0, pt.x)
+        contentY = Math.max(0, pt.y)
     }
     // This function is the inverse of goToPage(), returning (pageNumber, top, left).
     function getPagePosition() {
+        var pt = contentColumn.mapToItem(pdfCanvas, contentX, contentY)
         // Find the page on top
         var i = currentPage - 1
         var rect = pdfCanvas.pageRectangle( i )
-        while (rect.y > contentY && i > 0) {
+        while (rect.y > pt.y && i > 0) {
             rect = pdfCanvas.pageRectangle( --i )
         }
-        var top  = (contentY - rect.y) / rect.height
-        var left = (contentX - rect.x) / rect.width
+        var top  = (pt.y - rect.y) / rect.height
+        var left = (pt.x - rect.x) / rect.width
         return [i, top, left]
     }
     function getPositionAt(at) {
-        // Find the page that contains at
+        var pt = contentColumn.mapToItem(pdfCanvas, at.x, at.y)
+        // Find the page that contains pt
         var i = Math.max(0, currentPage - 2)
         var rect = pdfCanvas.pageRectangle( i )
-        while ((rect.y + rect.height) < at.y
+        while ((rect.y + rect.height) < pt.y
                && i < pdfCanvas.document.pageCount) {
             rect = pdfCanvas.pageRectangle( ++i )
         }
-        var top  = Math.max(0, at.y - rect.y) / rect.height
-        var left = (at.x - rect.x) / rect.width
+        var top  = Math.max(0, pt.y - rect.y) / rect.height
+        var left = (pt.x - rect.x) / rect.width
         return [i, top, left]
     }
 }

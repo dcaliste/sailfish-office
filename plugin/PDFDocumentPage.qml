@@ -18,6 +18,7 @@
 
 import QtQuick 2.0
 import Sailfish.Silica 1.0
+import Sailfish.Office 1.0
 import Sailfish.Office.PDF 1.0 as PDF
 import org.nemomobile.configuration 1.0
 import org.nemomobile.notifications 1.0
@@ -39,7 +40,7 @@ DocumentPage {
     documentItem: view
 
     function savePageSettings() {
-        if (!rememberPositionConfig.value || pdfDocument.failure || pdfDocument.locked) {
+        if (!rememberPositionConfig.value || !view.contentAvailable) {
             return
         }
         
@@ -73,11 +74,7 @@ DocumentPage {
                     _settings = new PDFStorage.Settings(pdfDocument.source)
                 }
                 var last = _settings.getLastPage()
-                if (last[3] > 0) {
-                    view.itemWidth = last[3]
-                    view.adjust()
-                }
-                view.goToPage( last[0] - 1, last[1], last[2] )
+                view.adjust(last[3] > 0 ? last[3] : view.itemWidth, [last[0] - 1, last[1], last[2]])
             }
             toolbar.show()
         }
@@ -107,6 +104,14 @@ DocumentPage {
         anchors.fill: parent
         anchors.bottomMargin: toolbar.offset
         document: pdfDocument
+        header: PageHeader {
+            title: pdfDocument.title != "" ? pdfDocument.title : info.baseName
+            FileInfo {
+                id: info
+                source: base.path
+            }
+        }
+
         onCanMoveBackChanged: if (canMoveBack) toolbar.show()
         onClicked: base.open = !base.open
         onLinkClicked: {

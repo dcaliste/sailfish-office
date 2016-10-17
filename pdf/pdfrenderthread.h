@@ -39,6 +39,7 @@ public:
 
     int pageCount() const;
     QObject* tocModel() const;
+    QString info(const QString &key) const;
     bool isLoaded() const;
     bool isFailed() const;
     bool isLocked() const;

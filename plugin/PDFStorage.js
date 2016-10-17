@@ -38,7 +38,7 @@ function createTableLastViewSettings(tx) {
 /* Get and set operations. */
 Settings.prototype.getLastPage = function() {
     var page = 0
-    var top = 0
+    var top = -1
     var left = 0
     var width = 0
     var file = this.source

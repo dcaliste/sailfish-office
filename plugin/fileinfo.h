@@ -28,6 +28,7 @@ class FileInfo : public QObject
     Q_OBJECT
     Q_PROPERTY(QString source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(QString fileName READ fileName NOTIFY sourceChanged)
+    Q_PROPERTY(QString baseName READ baseName NOTIFY sourceChanged)
     Q_PROPERTY(QUrl fullPath READ fullPath NOTIFY sourceChanged)
     Q_PROPERTY(qint64 fileSize READ fileSize NOTIFY sourceChanged)
     Q_PROPERTY(QString mimeType READ mimeType NOTIFY sourceChanged)
@@ -40,6 +41,7 @@ public:
 
     QString source() const;
     QString fileName() const;
+    QString baseName() const;
     QUrl fullPath() const;
     qint64 fileSize() const;
     QString mimeType() const;

@@ -261,6 +261,18 @@ PDFRenderThread::~PDFRenderThread()
     delete d;
 }
 
+QString PDFRenderThread::info(const QString &key) const
+{
+    QMutexLocker locker(&d->thread->mutex);
+
+    if (d->document != nullptr &&
+        !d->document->isLocked()) {
+        return d->document->info(key);
+    } else {
+        return QString();
+    }
+}
+
 int PDFRenderThread::pageCount() const
 {
     QMutexLocker locker(&d->thread->mutex);

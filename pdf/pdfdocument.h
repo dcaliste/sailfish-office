@@ -35,6 +35,7 @@ class PDFDocument : public QObject, public QQmlParserStatus
     Q_OBJECT
     Q_PROPERTY(QString source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(QString autoSavePath READ autoSavePath WRITE setAutoSavePath NOTIFY autoSavePathChanged)
+    Q_PROPERTY(QString title READ title NOTIFY documentLoadedChanged)
     Q_PROPERTY(int pageCount READ pageCount NOTIFY pageCountChanged)
     Q_PROPERTY(QObject* tocModel READ tocModel NOTIFY tocModelChanged)
     Q_PROPERTY(bool loaded READ isLoaded NOTIFY documentLoadedChanged)
@@ -56,6 +57,7 @@ public:
 
     QString source() const;
     QString autoSavePath() const;
+    QString title() const;
     int pageCount() const;
     QObject* tocModel() const;
     bool searching() const;

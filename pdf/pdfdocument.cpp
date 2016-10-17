@@ -78,6 +78,15 @@ QString PDFDocument::autoSavePath() const
     return d->autoSavePath;
 }
 
+QString PDFDocument::title() const
+{
+    if (d->thread && d->thread->isLoaded()) {
+        return d->thread->info(QStringLiteral("Title"));
+    }
+
+    return QString();
+}
+
 int PDFDocument::pageCount() const
 {
     if (d->thread && d->thread->isLoaded()) {

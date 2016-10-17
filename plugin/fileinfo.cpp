@@ -70,6 +70,11 @@ QString FileInfo::fileName() const
     return d->fileInfo.fileName();
 }
 
+QString FileInfo::baseName() const
+{
+    return d->fileInfo.baseName();
+}
+
 QUrl FileInfo::fullPath() const
 {
     return d->path;
