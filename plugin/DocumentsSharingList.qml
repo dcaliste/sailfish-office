@@ -39,10 +39,12 @@ ShareMethodList {
     source: menuList.path
 
     header: PageHeader {
-        title: menuList.title
         //: Share documents
         //% "Share"
-        description: qsTrId("sailfish-office-la-share")
+        property string defaultLabel: qsTrId("sailfish-office-la-share")
+
+        title: menuList.title != "" ? menuList.title : defaultLabel
+        description: menuList.title != "" ? defaultLabel : ""
     }
 
     // Add "add account" to the footer. User must be able to

@@ -35,15 +35,13 @@ SilicaFlickable {
                               ? pdfCanvas.currentPage : quickScrollAnimation.pageTo
     property alias selection: pdfSelection
     property alias selectionDraggable: selectionView.draggable
-    property bool canMoveBack: (_contentYAtGotoLink >= 0)
+    property bool canMoveBack: _pointAtGotoLink !== undefined
 
     property bool scaled: pdfCanvas.width != width
     property QtObject _feedbackEffect
 
     property int _pageAtLinkTarget
-    property int _pageAtGotoLink
-    property real _contentXAtGotoLink: -1.
-    property real _contentYAtGotoLink: -1.
+    property var _pointAtGotoLink
 
     property int _searchIndex
 
@@ -73,9 +71,6 @@ SilicaFlickable {
            to adjust to new height, so we use saved values. */
         contentX = oldContentX + (center.x * pdfCanvas.width / oldWidth) - center.x
         contentY = oldContentY + (center.y * pdfCanvas.height / oldHeight) - center.y
-
-        _contentXAtGotoLink = -1.
-        _contentYAtGotoLink = -1.
     }
 
     function adjust(pageWidth, fixPoint) {
@@ -145,11 +140,11 @@ SilicaFlickable {
             return
         }
 
-        scrollTo(Qt.point(_contentXAtGotoLink, _contentYAtGotoLink), _pageAtGotoLink)
+        scrollTo(contentAt(_pointAtGotoLink[0], _pointAtGotoLink[1],
+                           _pointAtGotoLink[2]), _pointAtGotoLink[0])
 
         _pageAtLinkTarget = 0
-        _contentXAtGotoLink = -1.
-        _contentYAtGotoLink = -1.
+        _pointAtGotoLink = undefined
     }
 
     SequentialAnimation {
@@ -320,8 +315,7 @@ SilicaFlickable {
                     && (currentPage > _pageAtLinkTarget + 1
                         || currentPage < _pageAtLinkTarget - 1)) {
                     _pageAtLinkTarget = 0
-                    _contentXAtGotoLink = -1.
-                    _contentYAtGotoLink = -1.
+                    _pointAtGotoLink = undefined
                 }
             }
 
@@ -351,9 +345,8 @@ SilicaFlickable {
                         var pt = base.contentAt(page - 1, top, left,
                                                 Theme.paddingLarge, Theme.paddingLarge)
                         _pageAtLinkTarget = page
-                        _pageAtGotoLink = pdfCanvas.currentPage
-                        _contentXAtGotoLink = base.contentX
-                        _contentYAtGotoLink = base.contentY
+                        _pointAtGotoLink = getPositionAt(Qt.point(base.contentX,
+                                                                  base.contentY))
                         scrollTo(pt, page)
                     }
                     onSelectionClicked: base.selectionClicked(selection, contextHook)

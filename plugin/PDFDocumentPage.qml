@@ -25,19 +25,20 @@ import org.nemomobile.notifications 1.0
 import QtQuick.LocalStorage 2.0
 import "PDFStorage.js" as PDFStorage
 
-DocumentPage {
+Page {
     id: base
+
+    property string title
+    property url path
+    property string mimeType
+    property Item documentItem: view
 
     property var _settings // Handle save and restore the view settings using PDFStorage
     property ContextMenu contextMenuLinks
     property ContextMenu contextMenuText
     property ContextMenu contextMenuHighlight
 
-    busy: (!pdfDocument.loaded && !pdfDocument.failure) || pdfDocument.searching
-    source: pdfDocument.source
-    indexCount: pdfDocument.pageCount
-    drawerVisible: !(pdfDocument.failure || pdfDocument.locked)
-    documentItem: view
+    allowedOrientations: Orientation.All
 
     function savePageSettings() {
         if (!rememberPositionConfig.value || !view.contentAvailable) {
@@ -51,7 +52,10 @@ DocumentPage {
         _settings.setLastPage(last[0] + 1, last[1], last[2], view.itemWidth)
     }
 
-    attachedPage: Component {
+    Component.onDestruction: window.documentItem = null
+
+    Component {
+        id: attachedPage
         PDFDocumentToCPage {
             tocModel: pdfDocument.tocModel
             pageCount: pdfDocument.pageCount
@@ -77,14 +81,19 @@ DocumentPage {
                 view.adjust(last[3] > 0 ? last[3] : view.itemWidth, [last[0] - 1, last[1], last[2]])
             }
             toolbar.show()
+            pageStack.pushAttached(attachedPage.createObject(base))
+            base.forwardNavigation = true
         }
     }
 
-    Binding {
-        target: base
-        property: "forwardNavigation"
-        value: false
-        when: (pdfDocument.failure || pdfDocument.locked)
+    backNavigation: pdfDocument.loaded
+
+    BusyIndicator {
+        id: busyIndicator
+        anchors.centerIn: parent
+        size: BusyIndicatorSize.Large
+        z: 1
+        running: (!pdfDocument.loaded && !pdfDocument.failure) || pdfDocument.searching
     }
 
     Loader {
@@ -112,10 +121,35 @@ DocumentPage {
             }
         }
 
+        PullDownMenu {
+            id: pulleyMenu
+            MenuItem {
+                //: Show the Details page
+                //% "Details"
+                text: qsTrId("sailfish-office-me-details_page");
+                onClicked: pageStack.push("DetailsPage.qml", {
+                    source: pdfDocument.source,
+                    indexCount: pdfDocument.pageCount,
+                    mimeType: base.mimeType
+                })
+            }
+            MenuItem {
+                //: Show the Details page
+                //% "Share"
+                text: qsTrId("sailfish-office-me-sharing_page");
+                onClicked: pageStack.push(sharingPage, {
+                    path: base.path,
+                    mimeType: base.mimeType
+                })
+            }
+        }
+        flickableDirection: pulleyMenu.active ? Flickable.VerticalFlick
+                                              : Flickable.AutoFlickDirection
+        boundsBehavior: atYBeginning && draggingVertically
+                        ? Flickable.DragOverBounds : Flickable.StopAtBounds
+
         onCanMoveBackChanged: if (canMoveBack) toolbar.show()
-        onClicked: base.open = !base.open
         onLinkClicked: {
-            base.open = false
             if (!contextMenuLinks) {
                 contextMenuLinks = contextMenuLinksComponent.createObject(base)
             }
@@ -123,7 +157,6 @@ DocumentPage {
             hook.showMenu(contextMenuLinks)
         }
         onAnnotationClicked: {
-            base.open = false
             switch (annotation.type) {
             case PDF.Annotation.Highlight:
                 if (!contextMenuHighlight) {
@@ -140,7 +173,6 @@ DocumentPage {
             }
         }
         onAnnotationLongPress: {
-            base.open = false
             switch (annotation.type) {
             case PDF.Annotation.Highlight:
                 if (!contextMenuHighlight) {
@@ -161,7 +193,6 @@ DocumentPage {
             }
         }
         onLongPress: {
-            base.open = false
             if (!contextMenuText) {
                 contextMenuText = contextMenuTextComponent.createObject(base)
             }
@@ -184,10 +215,11 @@ DocumentPage {
                 : Theme.itemSizeSmall
         anchors.top: view.bottom
         flickable: view
-        forceHidden: base.open || pdfDocument.failure || pdfDocument.locked
+        forceHidden: pdfDocument.failure || pdfDocument.locked
                      || (contextMenuLinks && contextMenuLinks.active)
                      || (contextMenuHighlight && contextMenuHighlight.active)
                      || (contextMenuText && contextMenuText.active)
+                     || pulleyMenu.active
         autoShowHide: !row.active
 
         function noticeShow(message) {
@@ -412,7 +444,7 @@ DocumentPage {
                 }
                 onClicked: {
                     row.toggle(pageCount)
-                    base.pushAttachedPage()
+                    pageStack.navigateForward()
                 }
             }
         }
@@ -506,6 +538,18 @@ DocumentPage {
     Component {
         id: contextMenuHighlightComponent
         PDFContextMenuHighlight { }
+    }
+
+    Component {
+        id: sharingPage
+        Page {
+            property alias path: sharingList.path
+            property alias mimeType: sharingList.mimeType
+            DocumentsSharingList {
+                id: sharingList
+                anchors.fill: parent
+            }
+        }
     }
 
     ConfigurationValue {
