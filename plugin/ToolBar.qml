@@ -27,7 +27,8 @@ PanelBackground {
     property bool autoShowHide: true
     property int offset: _active && !forceHidden ? height : 0
 
-    property bool _active
+    property bool _canFlick: flickable.contentHeight > flickable.height
+    property bool _active: !_canFlick
     property int _previousContentY
 
     function show() {
@@ -36,7 +37,7 @@ PanelBackground {
         }
         autoHideTimer.stop()
         _active = true
-        if (autoShowHide) autoHideTimer.restart()
+        if (autoShowHide && _canFlick) autoHideTimer.restart()
     }
     function hide() {
         _active = false
@@ -45,7 +46,7 @@ PanelBackground {
 
     onAutoShowHideChanged: {
         if (autoShowHide) {
-            if (_active) {
+            if (_active && _canFlick) {
                 autoHideTimer.start()
             }
         } else {
@@ -60,6 +61,8 @@ PanelBackground {
         if (forceHidden && autoShowHide) {
             _active = false
             autoHideTimer.stop()
+        } else if (!forceHidden && !_canFlick) {
+            _active = true
         }
     }
 
