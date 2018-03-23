@@ -28,41 +28,37 @@ PanelBackground {
     property int offset: _active && !forceHidden ? height : 0
 
     property bool _canFlick: flickable.contentHeight > flickable.height
-    property bool _active: !_canFlick
+    property bool _timerActivated
+    property bool _active: !forceHidden && (!_canFlick || _timerActivated)
     property int _previousContentY
 
     function show() {
-        if (forceHidden) {
-            return
-        }
         autoHideTimer.stop()
-        _active = true
-        if (autoShowHide && _canFlick) autoHideTimer.restart()
+        _timerActivated = true
+        if (autoShowHide) autoHideTimer.restart()
     }
     function hide() {
-        _active = false
+        _timerActivated = false
         autoHideTimer.stop()
     }
 
     onAutoShowHideChanged: {
         if (autoShowHide) {
-            if (_active && _canFlick) {
+            if (_timerActivated) {
                 autoHideTimer.start()
             }
         } else {
             autoHideTimer.stop()
             // Keep a transiting (and a not transited yet) toolbar visible.
-            _active = _active || (offset > 0)
+            _timerActivated = _timerActivated || (offset > 0)
         }
     }
 
     onForceHiddenChanged: {
-        // Avoid showing back the toolbar when forceHidden becomes false again.
-        if (forceHidden && autoShowHide) {
-            _active = false
+        // Ensure that toolbar will not come back after forceHidden is false again.
+        if (forceHidden) {
+            _timerActivated = false
             autoHideTimer.stop()
-        } else if (!forceHidden && !_canFlick) {
-            _active = true
         }
     }
 
@@ -76,9 +72,9 @@ PanelBackground {
             }
 
             if (autoShowHide) {
-                _active = flickable.contentY < _previousContentY
+                _timerActivated = flickable.contentY < _previousContentY
 
-                if (_active) {
+                if (_timerActivated) {
                     autoHideTimer.restart()
                 }
             }
@@ -90,6 +86,6 @@ PanelBackground {
     Timer {
         id: autoHideTimer
         interval: 4000
-        onTriggered: _active = false
+        onTriggered: _timerActivated = false
     }
 }
